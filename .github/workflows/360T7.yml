@@ -1,0 +1,748 @@
+name: build 360T7 Images
+ 
+env:
+  TZ: Asia/Shanghai
+  DOWNLOAD: 8
+  NPROC: 0
+  Vanilla: true
+  ENVIRONMENT: true
+  FAST: true
+  SSH: tru 
+  VanillaUboot: tru
+  PLUGINver: true
+  Release: true
+  
+on:
+  workflow_dispatch:
+    inputs:
+      INPUT_TARGET:
+        description: "Target to build (platform/target/subtarget)"
+        required: false
+        default: "all"
+  push:
+    paths: 
+      - '.github/workflows/360T7.yml'
+  schedule:
+    - cron: '0 4 * * 5'
+
+jobs:
+  Config:
+    name: Generate Config
+    permissions: write-all
+    runs-on: ubuntu-latest
+    outputs:
+      TARGETS: ${{ steps.find-targets.outputs.TARGETS }}
+ 
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+        
+      - name: SSH
+        if: env.SSH == 'true'
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: ${{ secrets.PORT }}
+          script: whoami
+        
+      - name: Find Targets
+        id: find-targets
+        env:
+          INPUT_TARGET: ${{ github.event.inputs.INPUT_TARGET }}
+        run: |
+          if [ "$INPUT_TARGET" = "all" ] || [ "$INPUT_TARGET" = "" ]; then
+            export TARGETS="$(cat config/platform.config)"
+          else
+            export TARGETS="$INPUT_TARGET"
+          fi
+          echo -e "\033[31m INPUT_TARGET=${INPUT_TARGETT} \033[0m"
+          echo -e "\033[31m TARGETS=${INPUT_TARGET} \033[0m"
+          echo -e "\033[31m INPUT_TARGET: \033[0m $INPUT_TARGET"
+          echo -e "\033[31m TARGETS:  $TARGETS \033[0m"
+          
+          JSON='{"config": ["default"], "targets":['
+          FIRST=1
+          for TARGET in $TARGETS; do
+            echo -e "\033[31m FIRST: $FIRST \033[0m"
+            [[ $FIRST -ne 1 ]] && JSON="$JSON"','
+            echo -e "\033[31m JSON1: $JSON \033[0m"
+            JSON="$JSON"'"'"${TARGET}"'"'
+            echo -e "\033[31m JSON2: $JSON \033[0m"
+            FIRST=0
+          done
+          JSON="$JSON"']}'
+          echo $JSON
+          echo "::set-output name=TARGETS::$JSON"
+
+  Mulit-Images:
+    name: ${{ matrix.TARGETS }}
+    needs: [Config]
+    permissions: write-all
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{fromJson(needs.Config.outputs.TARGETS)}}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Generate Variables
+        id: env
+        run: |
+          export SERIAL=$(echo ${{ matrix.TARGETS }} | awk -F '，' '{print $1}')
+          echo "SERIAL=$SERIAL" >> $GITHUB_ENV
+          export NAME=$(echo ${{ matrix.TARGETS }} | awk -F '，' '{print $2}')
+          echo "NAME=$NAME" >> $GITHUB_ENV
+          export CONFIG_FILE=$(echo ${{ matrix.TARGETS }} | awk -F '，' '{print $2}')".config"
+          echo "CONFIG_FILE=$CONFIG_FILE" >> $GITHUB_ENV
+          REPO_URL='https://github.com/'$(echo ${{ matrix.TARGETS }} | awk -F '，' '{print $3}') 
+          echo "REPO_URL=$REPO_URL" >> $GITHUB_ENV
+          export REPO_BRANCH=$(echo ${{ matrix.TARGETS }} | awk -F '，' '{print $4}')
+          echo "REPO_BRANCH=$REPO_BRANCH" >> $GITHUB_ENV
+          export DIY_P1_SH=$(echo ${{ matrix.TARGETS }} | awk -F '，' '{print $5}' )
+          echo "DIY_P1_SH=$DIY_P1_SH" >> $GITHUB_ENV
+          export DIY_P2_SH=$(echo ${{ matrix.TARGETS }} | awk -F '，' '{print $6}' )
+          echo "DIY_P2_SH=$DIY_P2_SH" >> $GITHUB_ENV
+          export DIY_P3_SH=$(echo ${{ matrix.TARGETS }} | awk -F '，' '{print $7}')
+          echo "DIY_P3_SH=$DIY_P3_SH" >> $GITHUB_ENV
+          
+          echo -e "\033[31m SERIAL:  $SERIAL \033[0m"
+          echo -e "\033[31m NAME:  $NAME \033[0m"
+          echo -e "\033[31m CONFIG_FILE:  $CONFIG_FILE \033[0m"
+          echo -e "\033[31m REPO_URL:  $REPO_URL \033[0m"
+          echo -e "\033[31m REPO_BRANCH:  $REPO_BRANCH \033[0m"
+          echo -e "\033[31m DIY_P1_SH:  $DIY_P1_SH \033[0m"
+          echo -e "\033[31m DIY_P2_SH:  $DIY_P2_SH  \033[0m"
+          echo -e "\033[31m DIY_P3_SH:  $DIY_P3_SH  \033[0m"
+          
+          echo "matrix.TARGETS: ${{ matrix.TARGETS }}"
+        
+      - name: 1.Mount onedrive
+        run: |
+          curl -s https://rclone.org/install.sh | sudo bash
+          sudo -E apt-get -qq install unzip
+          mkdir -p ~/.config/rclone/
+          unzip -P ${{ secrets.PASSWD_rclone }} rclone.zip -d ~/.config/rclone/
+          sudo mkdir /onedrive5g
+          sudo chown -R $USER:$GROUPS /onedrive5g
+          rclone mount one:/ /onedrive5g --daemon --copy-links --no-gzip-encoding --no-check-certificate
+          df -h
+          
+      - name: 1.File Name
+        run: |
+          chmod +x Shell/FileName.sh
+          bash Shell/FileName.sh  $GITHUB_ENV
+          echo "NUM: $NUM" 
+          
+      - name: 1.DIY_P3_SH
+        run: |
+          if [ -f Shell/$DIY_P3_SH ];then cd Shell 
+              chmod +x $DIY_P3_SH ; chmod +x REVISECONFIG.sh
+              cp $GITHUB_WORKSPACE/config/$CONFIG_FILE .
+              mv $CONFIG_FILE .config 
+              ./$DIY_P3_SH 
+              mv .config $GITHUB_WORKSPACE/config/$CONFIG_FILE
+              cat $GITHUB_WORKSPACE/config/$CONFIG_FILE
+          fi
+          
+      - name: Initialization Environment
+        if: env.ENVIRONMENT == 'true' && env.FAST != 'true'
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
+                gettext git libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget qemu-utils
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+          sudo timedatectl set-timezone "$TZ"
+          sudo mkdir -p /workdir
+          sudo chown $USER:$GROUPS /workdir
+          
+      - name: Clone source code
+        run: |
+          df -hT $PWD
+          git clone $REPO_URL -b $REPO_BRANCH openwrt
+          ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+          
+      - name: Load custom feeds
+        run: |
+          chmod +x Shell/$DIY_P1_SH
+          cd openwrt
+          echo '---------------------------------------------------------------'
+          $GITHUB_WORKSPACE/Shell/$DIY_P1_SH
+          
+      - name: Update feeds
+        run: cd openwrt && ./scripts/feeds update -a
+
+      - name: Install feeds
+        run: cd openwrt && ./scripts/feeds install -a
+
+      - name: 1.Load custom configuration
+        run: |
+          [ -e config/$CONFIG_FILE ] && cp config/$CONFIG_FILE openwrt/
+          sudo mkdir -p /workdir
+          sudo chown $USER:$GROUPS /workdir
+          ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+          chmod +x Shell/$DIY_P2_SH
+          chmod +x Shell/REVISECONFIG.sh && cp Shell/REVISECONFIG.sh openwrt/
+          cd openwrt
+          mv $CONFIG_FILE .config
+          $GITHUB_WORKSPACE/Shell/$DIY_P2_SH
+          cat .config
+          
+      - name: FAST Initialization Environment
+        working-directory: /workdir
+        if: env.ENVIRONMENT == 'true' && env.FAST == 'true'
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
+                gettext git libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget qemu-utils
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+          sudo timedatectl set-timezone "$TZ"
+          
+      - name: Download package_1
+        id: package_1
+        run: |
+          cd openwrt && make defconfig && make download -j$DOWNLOAD
+          find dl -size -1024c -exec ls -l {} \; 
+          find dl -size -1024c -exec rm -f {} \;
+        
+      - name: 1.Compile
+        id: compile_1
+        run: |
+          cd openwrt
+          echo -e "$(nproc) thread compile"
+          [[ $NPROC -eq 0 ]] && make -j$(nproc) || make -j$NPROC
+        
+      - name: 1.Compile failure
+        if: ${{ failure() }}
+        id: Compile_failure_1
+        run: |
+          cd openwrt && make -j1 V=99 
+
+      - name: 1.Check space usage
+        if: (!cancelled())
+        run: df -hT
+        
+      - name : 1.Upload BIN
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.BIN }}
+          path: openwrt/bin/
+          if-no-files-found: warn
+          
+      - name: 1.Upload factory
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.FACTORY }}
+          path: openwrt/bin/targets/*/*/*squashfs-factory.bin
+          if-no-files-found: ignore
+          
+      - name: 1.Upload sysupgrade
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.SYSUPGRADE }}
+          path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
+          if-no-files-found: ignore
+      
+      - name: 1.tar release
+        if: env.Release == 'true' && !failure() && !cancelled()
+        run: |
+          mkdir RELEASE
+          tar zcvf RELEASE/$BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
+          tar zcvf RELEASE/$FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
+          tar zcvf RELEASE/$SYSUPGRADE.tar.gz openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin || echo "ERROR: $NAME is no sysupgrade"
+
+#-----------------------------------------------------------------------
+      - name: 0. build Vanilla Uboot 
+        if: env.VanillaUboot == 'true' && !failure() && !cancelled()
+        run: |
+          rm -rf openwrt/bin openwrt/.config
+          cp config/$CONFIG_FILE openwrt/
+          cd openwrt
+          mv $CONFIG_FILE .config
+          echo "修改前"
+          cat .config
+          
+      - name: 0.修改后config
+        if: env.VanillaUboot == 'true' && !failure() && !cancelled()
+        run: |
+          cd openwrt && ./REVISECONFIG.sh  $NAME
+          echo "修改后"
+          cat .config
+
+      - name: 0.Download package
+        if: env.VanillaUboot == 'true' && !failure() && !cancelled()
+        id: package0
+        run: |
+          cd openwrt && rm -rf tmp
+          make defconfig && make download -j$DOWNLOAD
+          find dl -size -1024c -exec ls -l {} \; 
+          find dl -size -1024c -exec rm -f {} \;
+        
+      - name: 0.Compile
+        if: env.VanillaUboot == 'true' && !failure() && !cancelled()
+        id: compile_0
+        run: |
+          cd openwrt
+          echo -e "$(nproc) thread compile"
+          [[ $NPROC -eq 0 ]] && make -j$(nproc) || make -j$NPROC
+        
+      - name: 0.Compile failure
+        if: env.VanillaUboot == 'true' && env.PLUGINver == 'true' && failure()
+        id: Compile_failure_0
+        run: |
+          cd openwrt && make -j1 V=99 
+
+          
+      - name : 0.Upload Vanilla BIN stock（非108M 原厂Uboot）
+        if: env.VanillaUboot == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.VanillaBIN }}
+          path: openwrt/bin/
+          if-no-files-found: warn
+          
+      - name : 0.Upload Vanilla factory（非108M 原厂Uboot）
+        if: env.VanillaUboot == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.VanillaFACTORY }}
+          path: openwrt/bin/targets/*/*/*squashfs-factory.bin
+          if-no-files-found: ignore
+          
+      - name : 0.Upload Vanilla sysupgrade（非108M 原厂Uboot）
+        if: env.VanillaUboot == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.VanillaSYSUPGRADE }}
+          path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
+          if-no-files-found: ignore
+      
+      - name: 0.tar release
+        if: env.VanillaUboot == 'true' && !failure() && !cancelled()
+        run: |
+          tar zcvf RELEASE/$VanillaBIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
+          tar zcvf RELEASE/$VanillaFACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
+          tar zcvf RELEASE/$VanillaSYSUPGRADE.tar.gz openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin || echo "ERROR: $NAME is no sysupgrade"
+
+#-----------------------------------------------------------------------
+      - name: 2. 108M  ttyd filetransfer
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        run: |
+          rm -rf openwrt/bin openwrt/.config
+          cp config/$CONFIG_FILE openwrt/
+          cd openwrt && mv $CONFIG_FILE .config
+          echo "修改前"
+          cat .config
+          
+      - name: 2.修改后config
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        run: |
+          cd openwrt 
+          ./REVISECONFIG.sh  ttyd filetransfer
+          echo "修改后"
+          cat .config
+
+      - name: 2.Download package
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        id: package2
+        run: |
+          cd openwrt  && rm -rf tmp
+          make defconfig && make download -j$DOWNLOAD
+          find dl -size -1024c -exec ls -l {} \; 
+          find dl -size -1024c -exec rm -f {} \;
+        
+      - name: 2.Compile
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        id: compile_2
+        run: |
+          cd openwrt
+          echo -e "$(nproc) thread compile"
+          [[ $NPROC -eq 0 ]] && make -j$(nproc) || make -j$NPROC
+        
+      - name: 2.Compile failure
+        if: env.PLUGINver == 'true' && failure()
+        id: Compile_failure_2
+        run: |
+          cd openwrt && make -j1 V=99 
+
+          
+      - name : 2.Upload Vanilla BIN
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.mini_BIN }}
+          path: openwrt/bin/
+          if-no-files-found: warn
+
+      - name : 2.Upload factory
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.mini_FACTORY }}
+          path: openwrt/bin/targets/*/*/*squashfs-factory.bin
+          if-no-files-found: ignore
+          
+      - name : 2.Upload sysupgrade
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with: 
+          name: ${{ env.mini_SYSUPGRADE }}
+          path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
+          if-no-files-found: ignore
+      
+      - name: 2.tar release
+        if: env.Release == 'true' && !failure() && !cancelled() && env.PLUGINver == 'true'
+        run: |
+          tar zcvf RELEASE/$mini_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
+          tar zcvf RELEASE/$mini_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
+          tar zcvf RELEASE/$mini_SYSUPGRADE.tar.gz openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin || echo "ERROR: $NAME is no sysupgrade"
+          
+#-----------------------------------------------------------------------
+      - name: 3.108M ssrplus
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        run: |
+          rm -rf openwrt/bin openwrt/.config
+          cp config/$CONFIG_FILE openwrt/
+          cd openwrt && mv $CONFIG_FILE .config
+          echo "修改前"
+          cat .config
+          
+      - name: 3.修改后config
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        run: |
+          cd openwrt 
+          ./REVISECONFIG.sh  ttyd filetransfer ssr-plus
+          cat .config
+
+      - name: 3.Download package
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        id: package_3
+        run: |
+          cd openwrt  && rm -rf tmp
+          make defconfig && make download -j$DOWNLOAD
+          find dl -size -1024c -exec ls -l {} \; 
+          find dl -size -1024c -exec rm -f {} \;
+        
+      - name: 3.Compile
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        id: compile_3
+        run: |
+          cd openwrt
+          echo -e "$(nproc) thread compile"
+          [[ $NPROC -eq 0 ]] && make -j$(nproc) || make -j$NPROC
+        
+      - name: 3.Compile failure
+        if: env.PLUGINver == 'true' && failure()
+        id: Compile_failure_3
+        run: |
+          cd openwrt && make -j1 V=99 
+
+          
+      - name : 3.Upload Vanilla BIN
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.ssrplus_BIN }}
+          path: openwrt/bin/
+          if-no-files-found: warn
+
+      - name : 3.Upload factory
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.ssrplus_FACTORY }}
+          path: openwrt/bin/targets/*/*/*squashfs-factory.bin
+          if-no-files-found: ignore
+          
+      - name : 3.Upload sysupgrade
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.ssrplus_SYSUPGRADE }}
+          path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
+          if-no-files-found: ignore
+      
+      - name: 3.tar release
+        if: env.Release == 'true' && !failure() && !cancelled() && env.PLUGINver == 'true'
+        run: |
+          tar zcvf RELEASE/$ssrplus_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
+          tar zcvf RELEASE/$ssrplus_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
+          tar zcvf RELEASE/$ssrplus_SYSUPGRADE.tar.gz openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin || echo "ERROR: $NAME is no sysupgrade"
+          
+#-----------------------------------------------------------------------
+      - name: 4.108M passwall
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        run: |
+          rm -rf openwrt/bin openwrt/.config
+          cp config/$CONFIG_FILE openwrt/
+          cd openwrt && mv $CONFIG_FILE .config
+          echo "修改前"
+          cat .config
+          
+      - name: 4.修改后config
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        run: |
+          cd openwrt 
+          ./REVISECONFIG.sh  ttyd filetransfer passwall
+          cat .config
+
+      - name: 4.Download package
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        id: package_4
+        run: |
+          cd openwrt  && rm -rf tmp
+          make defconfig && make download -j$DOWNLOAD
+          find dl -size -1024c -exec ls -l {} \; 
+          find dl -size -1024c -exec rm -f {} \;
+        
+      - name: 4.Compile
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        id: compile_4
+        run: |
+          cd openwrt
+          echo -e "$(nproc) thread compile"
+          [[ $NPROC -eq 0 ]] && make -j$(nproc) || make -j$NPROC
+        
+      - name: 4.Compile failure
+        if: env.PLUGINver == 'true' && failure()
+        id: Compile_failure_4
+        run: |
+          cd openwrt && make -j1 V=99 
+
+          
+      - name : 4.Upload Vanilla BIN
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.passwall_BIN }}
+          path: openwrt/bin/
+          if-no-files-found: warn
+
+      - name : 4.Upload factory
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.passwall_FACTORY }}
+          path: openwrt/bin/targets/*/*/*squashfs-factory.bin
+          if-no-files-found: ignore
+          
+      - name : 4.Upload sysupgrade
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.passwall_SYSUPGRADE }}
+          path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
+          if-no-files-found: ignore
+      
+      - name: 4.tar release
+        if: env.Release == 'true' && !failure() && !cancelled() && env.PLUGINver == 'true'
+        run: |
+          tar zcvf RELEASE/$passwall_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
+          tar zcvf RELEASE/$passwall_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
+          tar zcvf RELEASE/$passwall_SYSUPGRADE.tar.gz openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin || echo "ERROR: $NAME is no sysupgrade"
+          
+#-----------------------------------------------------------------------
+      - name: 5.108M openclash
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        run: |
+          rm -rf openwrt/bin openwrt/.config
+          cp config/$CONFIG_FILE openwrt/
+          cd openwrt && mv $CONFIG_FILE .config
+          echo "修改前"
+          cat .config
+          
+      - name: 5.修改后config
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        run: |
+          cd openwrt 
+          ./REVISECONFIG.sh  ttyd filetransfer openclash
+          cat .config
+
+      - name: 5.Download package
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        id: package_5
+        run: |
+          cd openwrt  && rm -rf tmp
+          make defconfig && make download -j$DOWNLOAD
+          find dl -size -1024c -exec ls -l {} \; 
+          find dl -size -1024c -exec rm -f {} \;
+        
+      - name: 5.Compile
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        id: compile_5
+        run: |
+          cd openwrt
+          echo -e "$(nproc) thread compile"
+          [[ $NPROC -eq 0 ]] && make -j$(nproc) || make -j$NPROC
+        
+      - name: 5.Compile failure
+        if: env.PLUGINver == 'true' && failure()
+        id: Compile_failure_5
+        run: |
+          cd openwrt && make -j1 V=99 
+
+          
+      - name : 5.Upload Vanilla BIN
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.openclash_BIN }}
+          path: openwrt/bin/
+          if-no-files-found: warn
+
+      - name : 5.Upload factory
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.openclash_FACTORY }}
+          path: openwrt/bin/targets/*/*/*squashfs-factory.bin
+          if-no-files-found: ignore
+          
+      - name : 5.Upload sysupgrade
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.openclash_SYSUPGRADE }}
+          path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
+          if-no-files-found: ignore
+      
+      - name: 5.tar release
+        if: env.Release == 'true' && !failure() && !cancelled() && env.PLUGINver == 'true'
+        run: |
+          tar zcvf RELEASE/$openclash_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
+          tar zcvf RELEASE/$openclash_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
+          tar zcvf RELEASE/$openclash_SYSUPGRADE.tar.gz openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin || echo "ERROR: $NAME is no sysupgrade"
+
+#-----------------------------------------------------------------------
+      - name: 6.108M openclash ssrplus passwall
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        run: |
+          rm -rf openwrt/bin openwrt/.config
+          cp config/$CONFIG_FILE openwrt/
+          cd openwrt && mv $CONFIG_FILE .config
+          echo "修改前"
+          cat .config
+          
+      - name: 6.修改后config
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        run: |
+          cd openwrt 
+          ./REVISECONFIG.sh  ttyd filetransfer openclash ssr-plus passwall
+          cat .config
+
+      - name: 6.Download package
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        id: package_6
+        run: |
+          cd openwrt  && rm -rf tmp
+          make defconfig && make download -j$DOWNLOAD
+          find dl -size -1024c -exec ls -l {} \; 
+          find dl -size -1024c -exec rm -f {} \;
+        
+      - name: 6.Compile
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        id: compile_6
+        run: |
+          cd openwrt
+          echo -e "$(nproc) thread compile"
+          [[ $NPROC -eq 0 ]] && make -j$(nproc) || make -j$NPROC
+        
+      - name: 6.Compile failure
+        if: env.PLUGINver == 'true' && failure()
+        id: Compile_failure_6
+        run: |
+          cd openwrt && make -j1 V=99 
+          
+      - name : 6.Upload Vanilla BIN
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.openclash_ssrplus_passwall_BIN }}
+          path: openwrt/bin/
+          if-no-files-found: warn
+
+      - name : 6.Upload factory
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.openclash_ssrplus_passwall_FACTORY }}
+          path: openwrt/bin/targets/*/*/*squashfs-factory.bin
+          if-no-files-found: ignore
+          
+      - name : 6.Upload sysupgrade
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ env.openclash_ssrplus_passwall_SYSUPGRADE }}
+          path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
+          if-no-files-found: ignore
+      
+      - name: 6.tar release
+        if: env.Release == 'true' && !failure() && !cancelled() && env.PLUGINver == 'true'
+        run: |
+          tar zcvf RELEASE/$openclash_ssrplus_passwall_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
+          tar zcvf RELEASE/$openclash_ssrplus_passwall_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
+          tar zcvf RELEASE/$openclash_ssrplus_passwall_SYSUPGRADE.tar.gz openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin || echo "ERROR: $NAME is no sysupgrade"
+          
+#-----------------------------------------------------------------------
+      - name: 1.UPload1 test
+        id: UPload1
+        if: env.Release == 'true' && !failure() && !cancelled() 
+        run: |
+          times=0
+          while true;do up_status=`cat /onedrive5g/log/log.txt`  ||  up_status=1
+            if [[ $up_status != 0 ]];then echo "log is not 0, The OneDrive is being used " ; echo 'sleep 2m...' ; sleep 2m; let times++
+              if [[ $times -ge 10 ]];then echo "超过30分钟" ; echo "0" >  /onedrive5g/log/log.txt ; fi
+            else echo "up_status = $up_status"; echo "1" >  /onedrive5g/log/log.txt ;  break ; fi ; done
+          echo "::set-output name=status::success"
+          
+      - name: 1.UPload1 start
+        id: UPload1_start
+        if: env.Release == 'true' && steps.UPload1.outputs.status == 'success' && !failure() && !cancelled() 
+        run: |
+          logname=$(date +"%Y.%m.%d_%H.%M")
+          cp /onedrive5g/log/360T7_backup.log .
+          rclone copy -P --transfers=4 --ignore-errors --log-file=new.log -v RELEASE/ one:360T7/ && echo '上传成功' 
+          cat new.log 360T7_backup.log > /onedrive5g/log/360T7_backup.log
+          up_status=`cat /onedrive5g/log/log.txt`
+          echo "up_status: $up_status"
+          echo "0" >  /onedrive5g/log/log.txt
+          echo "up_status: $up_status"
+          
+      - name: 1.UPload Download Failure
+        if: env.Release == 'true' && steps.UPload1_start.outputs.status == 'success' && failure()
+        run: |
+          echo "0" >  /onedrive5g/log/log.txt
+          up_status=`cat /onedrive5g/log/log.txt`
+          echo "up_status: $up_status"
+      
+      - name: 1.Generate release tag1 latest
+        if: env.Release == 'true' && !failure()  && !cancelled()
+        id: tag1
+        run: |
+          echo "::set-output name=release_tag1::latest"
+          touch release.txt 
+          echo "🔗 [Cowtransfer] " >> release.txt
+          echo "::set-output name=status::success"
+          
+      - name: 1.Upload firmware to release
+        uses: softprops/action-gh-release@v1
+        if: steps.tag1.outputs.status == 'success' && !cancelled() && env.Release == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.tag1.outputs.release_tag1 }}
+          body_path: release.txt
+          files: |
+            RELEASE/*
