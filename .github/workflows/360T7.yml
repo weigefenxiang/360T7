@@ -9,7 +9,7 @@ env:
   FAST: true
   SSH: tru 
   VanillaUboot: tru
-  PLUGINver: true
+  PLUGINver: tru
   Release: tru
   LanzhouYun: true
   OneDrive: tru
@@ -257,8 +257,7 @@ jobs:
           path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
           if-no-files-found: ignore
       
-      - name: 1.tar release
-        if: env.Release == 'true' && !failure() && !cancelled()
+      - name: 1.tar
         run: |
           mkdir RELEASE
           tar zcvf RELEASE/$BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
@@ -331,7 +330,7 @@ jobs:
           path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
           if-no-files-found: ignore
       
-      - name: 0.tar release
+      - name: 0.tar
         if: env.VanillaUboot == 'true' && !failure() && !cancelled()
         run: |
           tar zcvf RELEASE/$VanillaBIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
@@ -404,8 +403,8 @@ jobs:
           path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
           if-no-files-found: ignore
       
-      - name: 2.tar release
-        if: env.Release == 'true' && !failure() && !cancelled() && env.PLUGINver == 'true'
+      - name: 2.tar
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
           tar zcvf RELEASE/$mini_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
           tar zcvf RELEASE/$mini_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
@@ -476,8 +475,8 @@ jobs:
           path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
           if-no-files-found: ignore
       
-      - name: 3.tar release
-        if: env.Release == 'true' && !failure() && !cancelled() && env.PLUGINver == 'true'
+      - name: 3.tar
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
           tar zcvf RELEASE/$ssrplus_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
           tar zcvf RELEASE/$ssrplus_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
@@ -548,8 +547,8 @@ jobs:
           path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
           if-no-files-found: ignore
       
-      - name: 4.tar release
-        if: env.Release == 'true' && !failure() && !cancelled() && env.PLUGINver == 'true'
+      - name: 4.tar
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
           tar zcvf RELEASE/$passwall_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
           tar zcvf RELEASE/$passwall_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
@@ -620,8 +619,8 @@ jobs:
           path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
           if-no-files-found: ignore
       
-      - name: 5.tar release
-        if: env.Release == 'true' && !failure() && !cancelled() && env.PLUGINver == 'true'
+      - name: 5.tar
+        if: env.PLUGINver == 'true' && !failure() && !cancelled() && 
         run: |
           tar zcvf RELEASE/$openclash_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
           tar zcvf RELEASE/$openclash_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
@@ -691,8 +690,8 @@ jobs:
           path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
           if-no-files-found: ignore
       
-      - name: 6.tar release
-        if: env.Release == 'true' && !failure() && !cancelled() && env.PLUGINver == 'true'
+      - name: 6.tar
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
           tar zcvf RELEASE/$openclash_ssrplus_passwall_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
           tar zcvf RELEASE/$openclash_ssrplus_passwall_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
