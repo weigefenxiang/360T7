@@ -763,7 +763,7 @@ jobs:
           rename "s/-360T7//" *
           sudo mv *BIN.tar.gz /tmp/
           times=0
-          while true;do Lanzhou_status=`cat /onedrive5g/log/Lanzhou_log.txt`  ||  Lanzhou_status=1
+          while true;do up_status=`cat /onedrive5g/log/Lanzhou_log.txt`  ||  up_status=1
             if [[ $up_status != 0 ]];then echo "log is not 0, The OneDrive is being used " ; echo 'sleep 1m...' ; sleep 1m; let times++
               if [[ $times -ge 20 ]];then echo "超过30分钟" ; echo "0" >  /onedrive5g/log/Lanzhou_log.txt ; fi
             else echo "up_status = $up_status"; echo "1" >  /onedrive5g/log/Lanzhou_log.txt ;  break ; fi ; done
