@@ -9,8 +9,9 @@ env:
   FAST: true
   SSH: tru 
   VanillaUboot: tru
-  PLUGINver: true
-  Release: true
+  PLUGINver: tru
+  Release: tru
+  LanzhouYun: true
   
 on:
   workflow_dispatch:
@@ -746,3 +747,30 @@ jobs:
           body_path: release.txt
           files: |
             RELEASE/*
+          
+      - name: 2.rename
+        run: |
+          sudo apt install rename
+          cd RELEASE
+          export RELEASE_dir=`pwd`
+          echo "RELEASE_dir=$RELEASE_dir" >> $GITHUB_ENV
+          rename "s/openclash/猫/" *
+          rename "s/ssrplus/师夷/" *
+          rename "s/passwall/pa斯沃/" *
+          rename "s/-360T7//" *
+          sudo mv *_BIN.tar.gz /tmp/
+          
+      - name: 2.LZY Environment
+        run: |
+          git clone https://github.com/weigefenxiang/LanZouCloud-API && cd LanZouCloud-API
+          sudo pip install -U pip
+          sudo pip install -r requirements.txt
+          sudo python3 setup.py install 
+          
+      - name: 2.UPload LanzhouYun
+        id: UPload_LanzhouYun
+        if: env.LanzhouYun == 'true' && steps.UPload1.outputs.status == 'success' && !failure() && !cancelled() 
+        run: |
+          python3 python/lzy.py ${{ secrets.LZ_YLOGIN }} ${{ secrets.LZ_PHPDISK }}  \
+                  'HISTORY'  'latest'  $RELEASE_dir
+
