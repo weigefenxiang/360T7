@@ -759,7 +759,7 @@ jobs:
           rename "s/ssrplus/师夷/" *
           rename "s/passwall/pa斯沃/" *
           rename "s/-360T7//" *
-          sudo mv *_BIN.tar.gz /tmp/
+          sudo mv *BIN.tar.gz /tmp/
           
       - name: 2.LZY Environment
         run: |
