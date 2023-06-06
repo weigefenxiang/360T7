@@ -750,6 +750,7 @@ jobs:
             RELEASE/*
           
       - name: 2.rename
+        if: env.LanzhouYun == 'true' && !failure() && !cancelled() 
         run: |
           sudo apt install rename
           cd RELEASE
@@ -762,6 +763,7 @@ jobs:
           sudo mv *BIN.tar.gz /tmp/
           
       - name: 2.LZY Environment
+        if: env.LanzhouYun == 'true' && !failure() && !cancelled() 
         run: |
           git clone https://github.com/weigefenxiang/LanZouCloud-API && cd LanZouCloud-API
           sudo pip install -U pip
@@ -770,7 +772,7 @@ jobs:
           
       - name: 2.UPload LanzhouYun
         id: UPload_LanzhouYun
-        if: env.LanzhouYun == 'true' && steps.UPload1.outputs.status == 'success' && !failure() && !cancelled() 
+        if: env.LanzhouYun == 'true' && !failure() && !cancelled() 
         run: |
           python3 python/lzy.py ${{ secrets.LZ_YLOGIN }} ${{ secrets.LZ_PHPDISK }}  \
                   'HISTORY'  'latest'  $RELEASE_dir
