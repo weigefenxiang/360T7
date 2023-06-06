@@ -9,7 +9,7 @@ env:
   FAST: true
   SSH: tru 
   VanillaUboot: tru
-  PLUGINver: tru
+  PLUGINver: true
   Release: tru
   LanzhouYun: true
   OneDrive: tru
@@ -620,7 +620,7 @@ jobs:
           if-no-files-found: ignore
       
       - name: 5.tar
-        if: env.PLUGINver == 'true' && !failure() && !cancelled() && 
+        if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
           tar zcvf RELEASE/$openclash_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
           tar zcvf RELEASE/$openclash_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
