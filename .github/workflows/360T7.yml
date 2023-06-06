@@ -123,7 +123,7 @@ jobs:
           echo "matrix.TARGETS: ${{ matrix.TARGETS }}"
         
       - name: 1.Mount onedrive
-        if: env.OneDrive == 'true'
+        if: env.OneDrive == 'true' || env.LanzhouYun == 'true' 
         run: |
           curl -s https://rclone.org/install.sh | sudo bash
           sudo -E apt-get -qq install unzip
@@ -750,6 +750,7 @@ jobs:
             RELEASE/*
           
       - name: 2.rename
+        id: LZY_start
         if: env.LanzhouYun == 'true' && !failure() && !cancelled() 
         run: |
           sudo apt install rename
@@ -761,9 +762,15 @@ jobs:
           rename "s/passwall/pa斯沃/" *
           rename "s/-360T7//" *
           sudo mv *BIN.tar.gz /tmp/
+          times=0
+          while true;do Lanzhou_status=`cat /onedrive5g/log/Lanzhou_log.txt`  ||  Lanzhou_status=1
+            if [[ $up_status != 0 ]];then echo "log is not 0, The OneDrive is being used " ; echo 'sleep 1m...' ; sleep 1m; let times++
+              if [[ $times -ge 20 ]];then echo "超过30分钟" ; echo "0" >  /onedrive5g/log/Lanzhou_log.txt ; fi
+            else echo "up_status = $up_status"; echo "1" >  /onedrive5g/log/Lanzhou_log.txt ;  break ; fi ; done
+          echo "::set-output name=status::success"
           
       - name: 2.LZY Environment
-        if: env.LanzhouYun == 'true' && !failure() && !cancelled() 
+        if: env.LanzhouYun == 'true' && steps.LZY_start.outputs.status == 'success' && !failure() && !cancelled() 
         run: |
           git clone https://github.com/weigefenxiang/LanZouCloud-API && cd LanZouCloud-API
           sudo pip install -U pip
@@ -772,8 +779,14 @@ jobs:
           
       - name: 2.UPload LanzhouYun
         id: UPload_LanzhouYun
-        if: env.LanzhouYun == 'true' && !failure() && !cancelled() 
+        if: env.LanzhouYun == 'true' && steps.LZY_start.outputs.status == 'success' && !failure() && !cancelled() 
         run: |
           python3 python/lzy.py ${{ secrets.LZ_YLOGIN }} ${{ secrets.LZ_PHPDISK }}  \
                   'HISTORY'  'latest'  $RELEASE_dir
+          echo "0" >  /onedrive5g/log/Lanzhou_log.txt
+          
+      - name: 2.LanzhouYun failer
+        if: env.LanzhouYun == 'true' && steps.LZY_start.outputs.status == 'success' && failure()
+        run: |
+          echo "0" >  /onedrive5g/log/Lanzhou_log.txt
 
