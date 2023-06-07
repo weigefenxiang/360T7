@@ -9,7 +9,7 @@ env:
   FAST: true
   SSH: tru
   VanillaUboot: tru
-  PLUGINver: tru
+  PLUGINver: true
   Release: tru
   LanzhouYun: true
   OneDrive: tru
