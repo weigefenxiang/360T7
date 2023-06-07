@@ -13,7 +13,7 @@ phpdisk_info = sys.argv[2]
 LZ_folder_name = sys.argv[3]
 MOVE_dir = sys.argv[4]
 Github_path = sys.argv[5]
-num = sys.argv[6]
+num = int(sys.argv[6])
 
 cookie = {'ylogin': f'{ylogin}', 'phpdisk_info': f'{phpdisk_info}'}
 
