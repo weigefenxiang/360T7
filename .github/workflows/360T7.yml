@@ -787,10 +787,13 @@ jobs:
             elif [[ $(($up_status%2)) == 1 ]];then echo "LZY is being used " ; echo 'sleep 1m...' ; sleep 1m; let times++ ;
               if [[ $times -ge 20 ]];then echo "超过20分钟" ; let up_status++ ; echo $up_status > /onedrive5g/log/Lanzhou_log.txt ; fi
             fi ; done
+          export up_status=$up_status
+          echo "up_status=$up_status" >> $GITHUB_ENV
 
       - name: 2.LanzhouYun failer
         if: env.LanzhouYun == 'true' && steps.LZY_start.outputs.status == 'success' && failure()
         run: |
           if [ $up_status -ge 4 ];then echo 0 > /onedrive5g/log/Lanzhou_log.txt ;
-          else let up_status++ ; echo $up_status > /onedrive5g/log/Lanzhou_log.txt ; fi
+          elif [[ $(($up_status%2)) == 1 ]];then let up_status++ ; echo $up_status > /onedrive5g/log/Lanzhou_log.txt ;
+          else echo "up_status：$up_status  正常退出" ; fi
 
