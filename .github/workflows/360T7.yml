@@ -1,5 +1,5 @@
 name: build 360T7 Images
- 
+
 env:
   TZ: Asia/Shanghai
   DOWNLOAD: 8
@@ -7,13 +7,13 @@ env:
   Vanilla: true
   ENVIRONMENT: true
   FAST: true
-  SSH: tru 
+  SSH: tru
   VanillaUboot: tru
   PLUGINver: tru
   Release: tru
   LanzhouYun: true
   OneDrive: tru
-  
+
 on:
   workflow_dispatch:
     inputs:
@@ -22,7 +22,7 @@ on:
         required: false
         default: "all"
   push:
-    paths: 
+    paths:
       - '.github/workflows/360T7.yml'
   schedule:
     - cron: '0 4 * * 5'
@@ -34,11 +34,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       TARGETS: ${{ steps.find-targets.outputs.TARGETS }}
- 
+
     steps:
       - name: Checkout
         uses: actions/checkout@main
-        
+
       - name: SSH
         if: env.SSH == 'true'
         uses: appleboy/ssh-action@master
@@ -48,7 +48,7 @@ jobs:
           password: ${{ secrets.PASSWORD }}
           port: ${{ secrets.PORT }}
           script: whoami
-        
+
       - name: Find Targets
         id: find-targets
         env:
@@ -121,9 +121,9 @@ jobs:
           echo -e "\033[31m DIY_P3_SH:  $DIY_P3_SH  \033[0m"
           
           echo "matrix.TARGETS: ${{ matrix.TARGETS }}"
-        
+
       - name: 1.Mount onedrive
-        if: env.OneDrive == 'true' || env.LanzhouYun == 'true' 
+        if: env.OneDrive == 'true' || env.LanzhouYun == 'true'
         run: |
           curl -s https://rclone.org/install.sh | sudo bash
           sudo -E apt-get -qq install unzip
@@ -133,13 +133,13 @@ jobs:
           sudo chown -R $USER:$GROUPS /onedrive5g
           rclone mount one:/ /onedrive5g --daemon --copy-links --no-gzip-encoding --no-check-certificate
           df -h
-          
+
       - name: 1.File Name
         run: |
           chmod +x Shell/FileName.sh
           bash Shell/FileName.sh  $GITHUB_ENV
           echo "NUM: $NUM" 
-          
+
       - name: 1.DIY_P3_SH
         run: |
           if [ -f Shell/$DIY_P3_SH ];then cd Shell 
@@ -150,7 +150,7 @@ jobs:
               mv .config $GITHUB_WORKSPACE/config/$CONFIG_FILE
               cat $GITHUB_WORKSPACE/config/$CONFIG_FILE
           fi
-          
+
       - name: Initialization Environment
         if: env.ENVIRONMENT == 'true' && env.FAST != 'true'
         env:
@@ -165,20 +165,20 @@ jobs:
           sudo timedatectl set-timezone "$TZ"
           sudo mkdir -p /workdir
           sudo chown $USER:$GROUPS /workdir
-          
+
       - name: Clone source code
         run: |
           df -hT $PWD
           git clone $REPO_URL -b $REPO_BRANCH openwrt
           ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
-          
+
       - name: Load custom feeds
         run: |
           chmod +x Shell/$DIY_P1_SH
           cd openwrt
           echo '---------------------------------------------------------------'
           $GITHUB_WORKSPACE/Shell/$DIY_P1_SH
-          
+
       - name: Update feeds
         run: cd openwrt && ./scripts/feeds update -a
 
@@ -197,7 +197,7 @@ jobs:
           mv $CONFIG_FILE .config
           $GITHUB_WORKSPACE/Shell/$DIY_P2_SH
           cat .config
-          
+
       - name: FAST Initialization Environment
         working-directory: /workdir
         if: env.ENVIRONMENT == 'true' && env.FAST == 'true'
@@ -211,21 +211,21 @@ jobs:
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
           sudo timedatectl set-timezone "$TZ"
-          
+
       - name: Download package_1
         id: package_1
         run: |
           cd openwrt && make defconfig && make download -j$DOWNLOAD
           find dl -size -1024c -exec ls -l {} \; 
           find dl -size -1024c -exec rm -f {} \;
-        
+
       - name: 1.Compile
         id: compile_1
         run: |
           cd openwrt
           echo -e "$(nproc) thread compile"
           [[ $NPROC -eq 0 ]] && make -j$(nproc) || make -j$NPROC
-        
+
       - name: 1.Compile failure
         if: ${{ failure() }}
         id: Compile_failure_1
@@ -235,28 +235,28 @@ jobs:
       - name: 1.Check space usage
         if: (!cancelled())
         run: df -hT
-        
+
       - name : 1.Upload BIN
         uses: actions/upload-artifact@master
         with:
           name: ${{ env.BIN }}
           path: openwrt/bin/
           if-no-files-found: warn
-          
+
       - name: 1.Upload factory
         uses: actions/upload-artifact@master
         with:
           name: ${{ env.FACTORY }}
           path: openwrt/bin/targets/*/*/*squashfs-factory.bin
           if-no-files-found: ignore
-          
+
       - name: 1.Upload sysupgrade
         uses: actions/upload-artifact@master
         with:
           name: ${{ env.SYSUPGRADE }}
           path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
           if-no-files-found: ignore
-      
+
       - name: 1.tar
         run: |
           mkdir RELEASE
@@ -265,7 +265,7 @@ jobs:
           tar zcvf RELEASE/$SYSUPGRADE.tar.gz openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin || echo "ERROR: $NAME is no sysupgrade"
 
 #-----------------------------------------------------------------------
-      - name: 0. build Vanilla Uboot 
+      - name: 0. build Vanilla Uboot
         if: env.VanillaUboot == 'true' && !failure() && !cancelled()
         run: |
           rm -rf openwrt/bin openwrt/.config
@@ -274,7 +274,7 @@ jobs:
           mv $CONFIG_FILE .config
           echo "修改前"
           cat .config
-          
+
       - name: 0.修改后config
         if: env.VanillaUboot == 'true' && !failure() && !cancelled()
         run: |
@@ -290,7 +290,7 @@ jobs:
           make defconfig && make download -j$DOWNLOAD
           find dl -size -1024c -exec ls -l {} \; 
           find dl -size -1024c -exec rm -f {} \;
-        
+
       - name: 0.Compile
         if: env.VanillaUboot == 'true' && !failure() && !cancelled()
         id: compile_0
@@ -298,14 +298,14 @@ jobs:
           cd openwrt
           echo -e "$(nproc) thread compile"
           [[ $NPROC -eq 0 ]] && make -j$(nproc) || make -j$NPROC
-        
+
       - name: 0.Compile failure
         if: env.VanillaUboot == 'true' && env.PLUGINver == 'true' && failure()
         id: Compile_failure_0
         run: |
           cd openwrt && make -j1 V=99 
 
-          
+
       - name : 0.Upload Vanilla BIN stock（非108M 原厂Uboot）
         if: env.VanillaUboot == 'true' && !failure() && !cancelled()
         uses: actions/upload-artifact@master
@@ -313,7 +313,7 @@ jobs:
           name: ${{ env.VanillaBIN }}
           path: openwrt/bin/
           if-no-files-found: warn
-          
+
       - name : 0.Upload Vanilla factory（非108M 原厂Uboot）
         if: env.VanillaUboot == 'true' && !failure() && !cancelled()
         uses: actions/upload-artifact@master
@@ -321,7 +321,7 @@ jobs:
           name: ${{ env.VanillaFACTORY }}
           path: openwrt/bin/targets/*/*/*squashfs-factory.bin
           if-no-files-found: ignore
-          
+
       - name : 0.Upload Vanilla sysupgrade（非108M 原厂Uboot）
         if: env.VanillaUboot == 'true' && !failure() && !cancelled()
         uses: actions/upload-artifact@master
@@ -329,7 +329,7 @@ jobs:
           name: ${{ env.VanillaSYSUPGRADE }}
           path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
           if-no-files-found: ignore
-      
+
       - name: 0.tar
         if: env.VanillaUboot == 'true' && !failure() && !cancelled()
         run: |
@@ -346,7 +346,7 @@ jobs:
           cd openwrt && mv $CONFIG_FILE .config
           echo "修改前"
           cat .config
-          
+
       - name: 2.修改后config
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
@@ -363,7 +363,7 @@ jobs:
           make defconfig && make download -j$DOWNLOAD
           find dl -size -1024c -exec ls -l {} \; 
           find dl -size -1024c -exec rm -f {} \;
-        
+
       - name: 2.Compile
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         id: compile_2
@@ -371,14 +371,14 @@ jobs:
           cd openwrt
           echo -e "$(nproc) thread compile"
           [[ $NPROC -eq 0 ]] && make -j$(nproc) || make -j$NPROC
-        
+
       - name: 2.Compile failure
         if: env.PLUGINver == 'true' && failure()
         id: Compile_failure_2
         run: |
           cd openwrt && make -j1 V=99 
 
-          
+
       - name : 2.Upload Vanilla BIN
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         uses: actions/upload-artifact@master
@@ -394,22 +394,22 @@ jobs:
           name: ${{ env.mini_FACTORY }}
           path: openwrt/bin/targets/*/*/*squashfs-factory.bin
           if-no-files-found: ignore
-          
+
       - name : 2.Upload sysupgrade
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         uses: actions/upload-artifact@master
-        with: 
+        with:
           name: ${{ env.mini_SYSUPGRADE }}
           path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
           if-no-files-found: ignore
-      
+
       - name: 2.tar
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
           tar zcvf RELEASE/$mini_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
           tar zcvf RELEASE/$mini_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
           tar zcvf RELEASE/$mini_SYSUPGRADE.tar.gz openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin || echo "ERROR: $NAME is no sysupgrade"
-          
+
 #-----------------------------------------------------------------------
       - name: 3.108M ssrplus
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
@@ -419,7 +419,7 @@ jobs:
           cd openwrt && mv $CONFIG_FILE .config
           echo "修改前"
           cat .config
-          
+
       - name: 3.修改后config
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
@@ -435,7 +435,7 @@ jobs:
           make defconfig && make download -j$DOWNLOAD
           find dl -size -1024c -exec ls -l {} \; 
           find dl -size -1024c -exec rm -f {} \;
-        
+
       - name: 3.Compile
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         id: compile_3
@@ -443,14 +443,14 @@ jobs:
           cd openwrt
           echo -e "$(nproc) thread compile"
           [[ $NPROC -eq 0 ]] && make -j$(nproc) || make -j$NPROC
-        
+
       - name: 3.Compile failure
         if: env.PLUGINver == 'true' && failure()
         id: Compile_failure_3
         run: |
           cd openwrt && make -j1 V=99 
 
-          
+
       - name : 3.Upload Vanilla BIN
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         uses: actions/upload-artifact@master
@@ -466,7 +466,7 @@ jobs:
           name: ${{ env.ssrplus_FACTORY }}
           path: openwrt/bin/targets/*/*/*squashfs-factory.bin
           if-no-files-found: ignore
-          
+
       - name : 3.Upload sysupgrade
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         uses: actions/upload-artifact@master
@@ -474,14 +474,14 @@ jobs:
           name: ${{ env.ssrplus_SYSUPGRADE }}
           path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
           if-no-files-found: ignore
-      
+
       - name: 3.tar
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
           tar zcvf RELEASE/$ssrplus_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
           tar zcvf RELEASE/$ssrplus_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
           tar zcvf RELEASE/$ssrplus_SYSUPGRADE.tar.gz openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin || echo "ERROR: $NAME is no sysupgrade"
-          
+
 #-----------------------------------------------------------------------
       - name: 4.108M passwall
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
@@ -491,7 +491,7 @@ jobs:
           cd openwrt && mv $CONFIG_FILE .config
           echo "修改前"
           cat .config
-          
+
       - name: 4.修改后config
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
@@ -507,7 +507,7 @@ jobs:
           make defconfig && make download -j$DOWNLOAD
           find dl -size -1024c -exec ls -l {} \; 
           find dl -size -1024c -exec rm -f {} \;
-        
+
       - name: 4.Compile
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         id: compile_4
@@ -515,14 +515,14 @@ jobs:
           cd openwrt
           echo -e "$(nproc) thread compile"
           [[ $NPROC -eq 0 ]] && make -j$(nproc) || make -j$NPROC
-        
+
       - name: 4.Compile failure
         if: env.PLUGINver == 'true' && failure()
         id: Compile_failure_4
         run: |
           cd openwrt && make -j1 V=99 
 
-          
+
       - name : 4.Upload Vanilla BIN
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         uses: actions/upload-artifact@master
@@ -538,7 +538,7 @@ jobs:
           name: ${{ env.passwall_FACTORY }}
           path: openwrt/bin/targets/*/*/*squashfs-factory.bin
           if-no-files-found: ignore
-          
+
       - name : 4.Upload sysupgrade
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         uses: actions/upload-artifact@master
@@ -546,14 +546,14 @@ jobs:
           name: ${{ env.passwall_SYSUPGRADE }}
           path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
           if-no-files-found: ignore
-      
+
       - name: 4.tar
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
           tar zcvf RELEASE/$passwall_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
           tar zcvf RELEASE/$passwall_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
           tar zcvf RELEASE/$passwall_SYSUPGRADE.tar.gz openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin || echo "ERROR: $NAME is no sysupgrade"
-          
+
 #-----------------------------------------------------------------------
       - name: 5.108M openclash
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
@@ -563,7 +563,7 @@ jobs:
           cd openwrt && mv $CONFIG_FILE .config
           echo "修改前"
           cat .config
-          
+
       - name: 5.修改后config
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
@@ -579,7 +579,7 @@ jobs:
           make defconfig && make download -j$DOWNLOAD
           find dl -size -1024c -exec ls -l {} \; 
           find dl -size -1024c -exec rm -f {} \;
-        
+
       - name: 5.Compile
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         id: compile_5
@@ -587,14 +587,14 @@ jobs:
           cd openwrt
           echo -e "$(nproc) thread compile"
           [[ $NPROC -eq 0 ]] && make -j$(nproc) || make -j$NPROC
-        
+
       - name: 5.Compile failure
         if: env.PLUGINver == 'true' && failure()
         id: Compile_failure_5
         run: |
           cd openwrt && make -j1 V=99 
 
-          
+
       - name : 5.Upload Vanilla BIN
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         uses: actions/upload-artifact@master
@@ -610,7 +610,7 @@ jobs:
           name: ${{ env.openclash_FACTORY }}
           path: openwrt/bin/targets/*/*/*squashfs-factory.bin
           if-no-files-found: ignore
-          
+
       - name : 5.Upload sysupgrade
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         uses: actions/upload-artifact@master
@@ -618,7 +618,7 @@ jobs:
           name: ${{ env.openclash_SYSUPGRADE }}
           path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
           if-no-files-found: ignore
-      
+
       - name: 5.tar
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
@@ -635,7 +635,7 @@ jobs:
           cd openwrt && mv $CONFIG_FILE .config
           echo "修改前"
           cat .config
-          
+
       - name: 6.修改后config
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
@@ -651,7 +651,7 @@ jobs:
           make defconfig && make download -j$DOWNLOAD
           find dl -size -1024c -exec ls -l {} \; 
           find dl -size -1024c -exec rm -f {} \;
-        
+
       - name: 6.Compile
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         id: compile_6
@@ -659,13 +659,13 @@ jobs:
           cd openwrt
           echo -e "$(nproc) thread compile"
           [[ $NPROC -eq 0 ]] && make -j$(nproc) || make -j$NPROC
-        
+
       - name: 6.Compile failure
         if: env.PLUGINver == 'true' && failure()
         id: Compile_failure_6
         run: |
           cd openwrt && make -j1 V=99 
-          
+
       - name : 6.Upload Vanilla BIN
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         uses: actions/upload-artifact@master
@@ -681,7 +681,7 @@ jobs:
           name: ${{ env.openclash_ssrplus_passwall_FACTORY }}
           path: openwrt/bin/targets/*/*/*squashfs-factory.bin
           if-no-files-found: ignore
-          
+
       - name : 6.Upload sysupgrade
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         uses: actions/upload-artifact@master
@@ -689,14 +689,14 @@ jobs:
           name: ${{ env.openclash_ssrplus_passwall_SYSUPGRADE }}
           path: openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin
           if-no-files-found: ignore
-      
+
       - name: 6.tar
         if: env.PLUGINver == 'true' && !failure() && !cancelled()
         run: |
           tar zcvf RELEASE/$openclash_ssrplus_passwall_BIN.tar.gz --exclude=openwrt/bin/targets/*/*/*squashfs-factory.bin  --exclude=openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin openwrt/bin/ || echo "$NAME is no directory BIN"
           tar zcvf RELEASE/$openclash_ssrplus_passwall_FACTORY.tar.gz openwrt/bin/targets/*/*/*squashfs-factory.bin || echo "$NAME is no factory.bin"
           tar zcvf RELEASE/$openclash_ssrplus_passwall_SYSUPGRADE.tar.gz openwrt/bin/targets/*/*/*squashfs-sysupgrade.bin || echo "ERROR: $NAME is no sysupgrade"
-          
+
 #-----------------------------------------------------------------------
       - name: 0.OneDrive Try
         id: UPload1
@@ -708,7 +708,7 @@ jobs:
               if [[ $times -ge 10 ]];then echo "超过30分钟" ; echo "0" >  /onedrive5g/log/log.txt ; fi
             else echo "up_status = $up_status"; echo "1" >  /onedrive5g/log/log.txt ;  break ; fi ; done
           echo "::set-output name=status::success"
-          
+
       - name: 0.UPload1 start OneDrive
         id: UPload1_start
         if:  env.OneDrive == 'true' && steps.UPload1.outputs.status == 'success' && !failure() && !cancelled()
@@ -721,14 +721,14 @@ jobs:
           echo "up_status: $up_status"
           echo "0" >  /onedrive5g/log/log.txt
           echo "up_status: $up_status"
-          
+
       - name: 0.UPload Over
         if:  env.OneDrive == 'true' && steps.UPload1_start.outputs.status == 'success' && failure()
         run: |
           echo "0" >  /onedrive5g/log/log.txt
           up_status=`cat /onedrive5g/log/log.txt`
           echo "up_status: $up_status"
-      
+
       - name: 1.Generate release tag1 latest
         if: env.Release == 'true' && !failure()  && !cancelled()
         id: tag1
@@ -737,7 +737,7 @@ jobs:
           touch release.txt 
           echo "🔗 [Cowtransfer] " >> release.txt
           echo "::set-output name=status::success"
-          
+
       - name: 1.Upload firmware to release
         uses: softprops/action-gh-release@v1
         if: steps.tag1.outputs.status == 'success' && !cancelled() && env.Release == 'true'
@@ -748,13 +748,17 @@ jobs:
           body_path: release.txt
           files: |
             RELEASE/*
-          
-      - name: 2.rename
+
+      - name: 2.LZY Environment
         id: LZY_start
-        if: env.LanzhouYun == 'true' && !failure() && !cancelled() 
+        if: env.LanzhouYun == 'true' && !failure() && !cancelled()
         run: |
+          git clone https://github.com/weigefenxiang/LanZouCloud-API && cd LanZouCloud-API
+          sudo pip install -U pip
+          sudo pip install -r requirements.txt
+          sudo python3 setup.py install 
           sudo apt install rename
-          cd RELEASE
+          cd $GITHUB_WORKSPACE/RELEASE
           export RELEASE_dir=`pwd`
           echo "RELEASE_dir=$RELEASE_dir" >> $GITHUB_ENV
           rename "s/openclash/猫/" *
@@ -762,31 +766,31 @@ jobs:
           rename "s/passwall/pa斯沃/" *
           rename "s/-360T7//" *
           sudo mv *BIN.tar.gz /tmp/
-          times=0
-          while true;do up_status=`cat /onedrive5g/log/Lanzhou_log.txt`  ||  up_status=1
-            if [[ $up_status != 0 ]];then echo "log is not 0, The OneDrive is being used " ; echo 'sleep 1m...' ; sleep 1m; let times++
-              if [[ $times -ge 20 ]];then echo "超过30分钟" ; echo "0" >  /onedrive5g/log/Lanzhou_log.txt ; fi
-            else echo "up_status = $up_status"; echo "1" >  /onedrive5g/log/Lanzhou_log.txt ;  break ; fi ; done
           echo "::set-output name=status::success"
-          
-      - name: 2.LZY Environment
-        if: env.LanzhouYun == 'true' && steps.LZY_start.outputs.status == 'success' && !failure() && !cancelled() 
-        run: |
-          git clone https://github.com/weigefenxiang/LanZouCloud-API && cd LanZouCloud-API
-          sudo pip install -U pip
-          sudo pip install -r requirements.txt
-          sudo python3 setup.py install 
-          
+
       - name: 2.UPload LanzhouYun
-        id: UPload_LanzhouYun
-        if: env.LanzhouYun == 'true' && steps.LZY_start.outputs.status == 'success' && !failure() && !cancelled() 
+        if: env.LanzhouYun == 'true' && !failure() && !cancelled()
         run: |
-          python3 python/lzy.py ${{ secrets.LZ_YLOGIN }} ${{ secrets.LZ_PHPDISK }}  \
-                  'HISTORY'  'latest'  $RELEASE_dir
-          echo "0" >  /onedrive5g/log/Lanzhou_log.txt
-          
+          times=0
+          cd RELEASE
+          while true;do up_status=`cat /onedrive5g/log/Lanzhou_log.txt`
+            if [[ $up_status == 0 ]];then echo "LZY 暂未被开启"; let up_status++ ; echo $up_status > /onedrive5g/log/Lanzhou_log.txt
+              python3 python/lzy.py ${{ secrets.LZ_YLOGIN }} ${{ secrets.LZ_PHPDISK }}  \
+                  'HISTORY'  'latest'  $RELEASE_dir 0
+              let up_status++ ; echo $up_status > /onedrive5g/log/Lanzhou_log.txt ; break
+            elif [[ $(($up_status%2)) == 0 ]];then  echo "LZY 已开启，直接上传" ; let up_status++ ; echo $up_status > /onedrive5g/log/Lanzhou_log.txt ;
+              python3 python/lzy.py ${{ secrets.LZ_YLOGIN }} ${{ secrets.LZ_PHPDISK }}  \
+                  'HISTORY'  'latest'  $RELEASE_dir 1
+              let up_status++ ; 
+              if [[ $up_status == 6 ]];then echo 0 > /onedrive5g/log/Lanzhou_log.txt ; else echo $up_status > /onedrive5g/log/Lanzhou_log.txt ; fi
+              break
+            elif [[ $(($up_status%2)) == 1 ]];then echo "LZY is being used " ; echo 'sleep 1m...' ; sleep 1m; let times++ ;
+              if [[ $times -ge 20 ]];then echo "超过20分钟" ; let up_status++ ; echo $up_status > /onedrive5g/log/Lanzhou_log.txt ; fi
+            fi ; done
+
       - name: 2.LanzhouYun failer
         if: env.LanzhouYun == 'true' && steps.LZY_start.outputs.status == 'success' && failure()
         run: |
-          echo "0" >  /onedrive5g/log/Lanzhou_log.txt
+          if [ $up_status -ge 4 ];then echo 0 > /onedrive5g/log/Lanzhou_log.txt ;
+          else let up_status++ ; echo $up_status > /onedrive5g/log/Lanzhou_log.txt ; fi
 
