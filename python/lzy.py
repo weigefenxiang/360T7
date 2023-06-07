@@ -13,6 +13,7 @@ phpdisk_info = sys.argv[2]
 LZ_folder_name = sys.argv[3]
 MOVE_dir = sys.argv[4]
 Github_path = sys.argv[5]
+num = sys.argv[6]
 
 cookie = {'ylogin': f'{ylogin}', 'phpdisk_info': f'{phpdisk_info}'}
 
@@ -152,8 +153,9 @@ def main():
     lz = lanzou()
     nowtime = str(datetime.datetime.now().strftime('%Y-%m-%d_%H_%M.%S'))
     father_id = lz.get_FOLDER_ID(LZ_folder_name)
-    lz.MKDIR_folder(father_id, nowtime, f'历史资料')
-    lz.MKDIR_files_from_folder(MOVE_dir, nowtime)
+    if num == 0:
+        lz.MKDIR_folder(father_id, nowtime, f'历史资料')
+        lz.MKDIR_files_from_folder(MOVE_dir, nowtime)
     lz.UPLOAD_files_from_DIR(Github_path, MOVE_dir)
 
 
