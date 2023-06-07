@@ -9,7 +9,7 @@ env:
   FAST: true
   SSH: tru
   VanillaUboot: tru
-  PLUGINver: true
+  PLUGINver: tru
   Release: tru
   LanzhouYun: true
   OneDrive: tru
@@ -769,27 +769,35 @@ jobs:
           echo "::set-output name=status::success"
 
       - name: 2.UPload LanzhouYun
+        id: LZY_UPload
         if: env.LanzhouYun == 'true' && !failure() && !cancelled()
         run: |
           times=0
-          cd RELEASE
-          while true;do up_status=`cat /onedrive5g/log/Lanzhou_log.txt`
-            if [[ $up_status == 0 ]];then echo "LZY 暂未被开启"; let up_status++ ; echo $up_status > /onedrive5g/log/Lanzhou_log.txt
+          while true;do LZYstatus=`cat /onedrive5g/log/Lanzhou_log.txt` || echo "LZYstatus 获取失败"
+            if [[ $LZYstatus == 0 ]];then echo "LZY 暂未被开启" && echo "LZYstatus: $LZYstatus" ; LZYstatus=$(($LZYstatus+1)) ; echo $LZYstatus > /onedrive5g/log/Lanzhou_log.txt
               python3 python/lzy.py ${{ secrets.LZ_YLOGIN }} ${{ secrets.LZ_PHPDISK }}  \
                   'HISTORY'  'latest'  $RELEASE_dir 0
-              let up_status++ ; echo $up_status > /onedrive5g/log/Lanzhou_log.txt ; break
-            elif [[ $(($up_status%2)) == 0 ]];then  echo "LZY 已开启，直接上传" ; let up_status++ ; echo $up_status > /onedrive5g/log/Lanzhou_log.txt ;
+              LZYstatus=$(($LZYstatus+1)) ; echo $LZYstatus > /onedrive5g/log/Lanzhou_log.txt ; 
+              break
+            elif [[ $(($LZYstatus%2)) == 0 ]];then  echo "LZY 已开启，直接上传" && echo "LZYstatus: $LZYstatus" ; LZYstatus=$(($LZYstatus+1)) ; echo $LZYstatus > /onedrive5g/log/Lanzhou_log.txt ;
               python3 python/lzy.py ${{ secrets.LZ_YLOGIN }} ${{ secrets.LZ_PHPDISK }}  \
                   'HISTORY'  'latest'  $RELEASE_dir 1
-              let up_status++ ; 
-              if [[ $up_status == 6 ]];then echo 0 > /onedrive5g/log/Lanzhou_log.txt ; else echo $up_status > /onedrive5g/log/Lanzhou_log.txt ; fi
+              LZYstatus=$(($LZYstatus+1)) ; 
+              if [[ $LZYstatus == 6 ]];then echo 0 > /onedrive5g/log/Lanzhou_log.txt && echo -e "LZYstatus：$LZYstatus 成功初始化\nLanzhou_log=0" ; else echo $LZYstatus > /onedrive5g/log/Lanzhou_log.txt ; fi
               break
-            elif [[ $(($up_status%2)) == 1 ]];then echo "LZY is being used " ; echo 'sleep 1m...' ; sleep 1m; let times++ ;
-              if [[ $times -ge 20 ]];then echo "超过20分钟" ; let up_status++ ; echo $up_status > /onedrive5g/log/Lanzhou_log.txt ; fi
+            elif [[ $(($LZYstatus%2)) == 1 ]];then echo "LZY is being used " && echo "LZYstatus: $LZYstatus" ; echo 'sleep 20s...' ; sleep 20s ; let times++ ;
+              if [[ $times -ge 20 ]];then echo "超过400s" ; LZYstatus=$(($LZYstatus+1)) ; echo $LZYstatus > /onedrive5g/log/Lanzhou_log.txt ; fi
+            else echo "LZYstatus 获取失败" ; echo "sleep 20s" ; sleep 20s
             fi ; done
-          export up_status=$up_status
-          echo "up_status=$up_status" >> $GITHUB_ENV
+          export LZYstatus=$LZYstatus
+          echo "LZYstatus=$LZYstatus" >> $GITHUB_ENV
+          echo "::set-output name=status::success"
 
+      - name: 2.蓝奏云同步成功
+        if: env.LanzhouYun == 'true' && steps.LZY_UPload.outputs.status == 'success'
+        run: |
+          echo "蓝奏云同步成功"
+          
       - name: 2.LanzhouYun failer
         if: env.LanzhouYun == 'true' && steps.LZY_start.outputs.status == 'success' && failure()
         run: |
