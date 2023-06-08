@@ -704,7 +704,7 @@ jobs:
         run: |
           times=0
           while true;do up_status=`cat /onedrive5g/log/log.txt`  ||  up_status=1
-            if [[ $up_status != 0 ]];then echo "log is not 0, The OneDrive is being used " ; echo 'sleep 2m...' ; sleep 2m; let times++
+            if [[ $up_status != 0 ]];then echo "log is not 0, The OneDrive is being used " ; echo 'sleep 2m...' ; sleep 2m; times=$(($times+1))
               if [[ $times -ge 10 ]];then echo "超过30分钟" ; echo "0" >  /onedrive5g/log/log.txt ; fi
             else echo "up_status = $up_status"; echo "1" >  /onedrive5g/log/log.txt ;  break ; fi ; done
           echo "::set-output name=status::success"
@@ -785,8 +785,8 @@ jobs:
               LZYstatus=$(($LZYstatus+1)) ; 
               if [[ $LZYstatus == 6 ]];then echo 0 > /onedrive5g/log/Lanzhou_log.txt && echo -e "LZYstatus：$LZYstatus 成功初始化\nLanzhou_log=0" ; else echo $LZYstatus > /onedrive5g/log/Lanzhou_log.txt ; fi
               break
-            elif [[ $(($LZYstatus%2)) == 1 ]];then echo "LZY is being used " && echo "LZYstatus: $LZYstatus" ; echo 'sleep 20s...' ; sleep 20s ; let times++ ;
-              if [[ $times -ge 20 ]];then echo "超过400s" ; LZYstatus=$(($LZYstatus+1)) ; echo $LZYstatus > /onedrive5g/log/Lanzhou_log.txt ; fi
+            elif [[ $(($LZYstatus%2)) == 1 ]];then echo "LZY is being used " && echo "LZYstatus: $LZYstatus" ; echo 'sleep 20s...' ; sleep 20s ; times=$(($times+1))
+              if [[ $times -ge 20 ]];then echo "超时 400s" ; LZYstatus=$(($LZYstatus+1)) ; echo $LZYstatus > /onedrive5g/log/Lanzhou_log.txt ; fi
             else echo "LZYstatus 获取失败" ; echo "sleep 20s" ; sleep 20s
             fi ; done
           export LZYstatus=$LZYstatus
@@ -801,7 +801,7 @@ jobs:
       - name: 2.LanzhouYun failer
         if: env.LanzhouYun == 'true' && steps.LZY_start.outputs.status == 'success' && failure()
         run: |
-          if [ $up_status -ge 4 ];then echo 0 > /onedrive5g/log/Lanzhou_log.txt ;
-          elif [[ $(($up_status%2)) == 1 ]];then let up_status++ ; echo $up_status > /onedrive5g/log/Lanzhou_log.txt ;
-          else echo "up_status：$up_status  正常退出" ; fi
+          if [ $LZYstatus -ge 4 ];then echo 0 > /onedrive5g/log/Lanzhou_log.txt ;
+          elif [[ $(($LZYstatus%2)) == 1 ]];then LZYstatus=$(($LZYstatus+1)) ; echo $LZYstatus > /onedrive5g/log/Lanzhou_log.txt ;
+          else echo "LZYstatus：$LZYstatus  正常退出" ; fi
 
