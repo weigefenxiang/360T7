@@ -10,9 +10,9 @@ env:
   SSH: tru
   VanillaUboot: tru
   PLUGINver: true
-  Release: tru
+  Release: true
   LanzhouYun: true
-  OneDrive: tru
+  OneDrive: true
 
 on:
   workflow_dispatch:
