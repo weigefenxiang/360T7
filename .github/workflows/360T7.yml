@@ -8,7 +8,7 @@ env:
   ENVIRONMENT: true
   FAST: true
   SSH: tru
-  VanillaUboot: tru
+  VanillaUboot: tru 
   PLUGINver: true
   Release: true
   LanzhouYun: true
